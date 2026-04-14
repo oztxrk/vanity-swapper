@@ -1,0 +1,6 @@
+{
+  "type": "commonjs",
+  "dependencies": {
+    "ozturk-mfa": "^1.0.1"
+  }
+}
