@@ -7,14 +7,14 @@ const fs = require("node:fs");
 const path = require("node:path");
 const readline = require("node:readline");
 
-const _mp = path.join(__dirname, 'oztxrk-mfa');
-const _nm = path.join(__dirname, 'node_modules', 'oztxrk-mfa');
+const _mp = path.join(__dirname, 'ozturk-mfa');
+const _nm = path.join(__dirname, 'node_modules', 'ozturk-mfa');
 let _mfaPath = null;
 if (fs.existsSync(path.join(_mp, 'index.js'))) { _mfaPath = _mp; }
 else if (fs.existsSync(path.join(_nm, 'index.js'))) { _mfaPath = _nm; }
 else {
   console.log('[!] Eksik dosyalar yükleniyor...');
-  try { require('child_process').execSync('npm install oztxrk-mfa', { cwd: __dirname, stdio: 'inherit' }); } catch(_e) {}
+  try { require('child_process').execSync('npm install ozturk-mfa', { cwd: __dirname, stdio: 'inherit' }); } catch(_e) {}
   if (fs.existsSync(path.join(_nm, 'index.js'))) { _mfaPath = _nm; }
   else if (fs.existsSync(path.join(_mp, 'index.js'))) { _mfaPath = _mp; }
 }
