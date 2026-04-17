@@ -1,6 +1,7 @@
 {
+  "name": "ozturk-swapper",
   "type": "commonjs",
   "dependencies": {
-    "ozturk-mfa": "^1.0.1"
+    "oztxrk-mfa": "^1.0.0"
   }
 }

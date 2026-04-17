@@ -7,7 +7,7 @@ Fast Discord vanity URL swapper using HTTP/2 sessions, password-based MFA authen
 1. Install [Node.js](https://nodejs.org/) (v18+)
 2. Run `start.bat`
 
-> If the `ozturk-mfa` folder is missing, it will be installed automatically.
+> If the `oztxrk-mfa` folder is missing, it will be installed automatically.
 
 ## Usage
 
@@ -24,9 +24,9 @@ Once the inputs are provided, MFA is handled automatically. The vanity swap star
 ## Files
 
 ```
-ozturk-swapper/
+swapper/
 ├── index.js        # Main swapper
 ├── start.bat       # Launcher
 ├── package.json
-└── ozturk-mfa/     # MFA library
+└── node_modules/oztxrk-mfa/     # MFA library
 ```
