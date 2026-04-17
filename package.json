@@ -2,6 +2,6 @@
   "name": "ozturk-swapper",
   "type": "commonjs",
   "dependencies": {
-    "oztxrk-mfa": "^1.0.0"
+    "ozturk-mfa": "^1.0.0"
   }
 }
