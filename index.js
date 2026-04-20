@@ -139,15 +139,15 @@ session.once("connect", () => {
 
 function startUserInput() {
   rl.question('Token: ', (inputToken) => {
-    token = inputToken;
+    token = inputToken.trim();
     rl.question('Şifre: ', (inputPassword) => {
-      password = inputPassword;
+      password = inputPassword.trim();
       rl.question('Sunucu ID: ', (inputServerID) => {
-        serverID = inputServerID;
+        serverID = inputServerID.trim();
         rl.question('Webhook: ', (inputWebhookURL) => {
-          webhookURL = inputWebhookURL;
+          webhookURL = inputWebhookURL.trim();
           rl.question('Vanity: ', (inputVanityURL) => {
-            vanityURL = inputVanityURL;
+            vanityURL = inputVanityURL.trim();
             rl.close();
             H2H_PATCH[":path"] = `/api/v9/guilds/${serverID}/vanity-url`;
             H2H_PATCH["authorization"] = token;
@@ -182,17 +182,57 @@ function h2req(path, method, body, extraHeaders = {}) {
   });
 }
 
+const MFA_UA_MIN = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) ravi/1.0.9164 Chrome/124.0.6367.243 Electron/30.2.0 Safari/537.36";
+const MFA_SP_MIN = "eyJvcyI6IkFuZHJvaWQiLCJicm93c2VyIjoiQW5kcm9pZCBDaHJvbWUiLCJkZXZpY2UiOiJBbmRyb2lkIiwic3lzdGVtX2xvY2FsZSI6InRyLVRSIiwiYnJvd3Nlcl91c2VyX2FnZW50IjoiTW96aWxsYS81LjAgKExpbnV4OyBBbmRyb2lkIDYuMDsgTmV4dXMgNSBCdWlsZC9NUkE1OE4pIEFwcGxlV2ViS2l0LzUzNy4zNiAoS0hUTUwsIGxpa2UgR2Vja28pIENocm9tZS8xMzEuMC4wLjAgTW9iaWxlIFNhZmFyaS81MzcuMzYiLCJicm93c2VyX3ZlcnNpb24iOiIxMzEuMC4wLjAiLCJvc192ZXJzaW9uIjoiNi4wIiwicmVmZXJyZXIiOiJodHRwczovL2Rpc2NvcmQuY29tL2NoYW5uZWxzL0BtZS8xMzAzMDQ1MDIyNjQzNTIzNjU1IiwicmVmZXJyaW5nX2RvbWFpbiI6ImRpc2NvcmQuY29tIiwicmVmZXJyZXJfY3VycmVudCI6IiIsInJlZmVycmluZ19kb21haW5fY3VycmVudCI6IiIsInJlbGVhc2VfY2hhbm5lbCI6InN0YWJsZSIsImNsaWVudF9idWlsZF9udW1iZXIiOjM1NTYyNCwiY2xpZW50X2V2ZW50X3NvdXJjZSI6bnVsbCwiaGFzX2NsaWVudF9tb2RzIjpmYWxzZX0=";
+
+let _mfaH2 = null;
+function mfaH2() {
+  if (_mfaH2 && !_mfaH2.destroyed && !_mfaH2.closed) return _mfaH2;
+  _mfaH2 = http2.connect('https://canary.discord.com', {
+    createConnection: () => tls.connect(443, 'canary.discord.com', { rejectUnauthorized: false, ALPNProtocols: ['h2'], servername: 'canary.discord.com' }),
+    settings: { enablePush: false }
+  });
+  _mfaH2.on('error', () => {});
+  _mfaH2.on('close', () => { _mfaH2 = null; });
+  _mfaH2.on('goaway', () => { try { _mfaH2.destroy(); } catch(_e) {} _mfaH2 = null; });
+  return _mfaH2;
+}
+
+function mfaH2ReqMin(method, urlPath, body) {
+  return new Promise((resolve, reject) => {
+    const s = mfaH2();
+    const hdrs = {
+      ':method': method, ':path': urlPath, ':authority': 'canary.discord.com', ':scheme': 'https',
+      'user-agent': MFA_UA_MIN,
+      'authorization': token,
+      'content-type': 'application/json',
+      'x-super-properties': MFA_SP_MIN
+    };
+    const req = s.request(hdrs, { endStream: !body });
+    req.setTimeout(10000, () => { req.destroy(); reject(new Error('TIMEOUT')); });
+    let st = 0; const ch = [];
+    req.on('response', h => { st = h[':status']; });
+    req.on('data', c => ch.push(c));
+    req.on('end', () => {
+      try { const j = JSON.parse(Buffer.concat(ch).toString() || '{}'); j._st = st; resolve(j); }
+      catch { resolve({ _st: st, _err: 1 }); }
+    });
+    req.on('error', reject);
+    if (body) req.end(Buffer.from(body)); else req.end();
+  });
+}
+
 async function handleMFA() {
   try {
-    const r1 = await h2req(`/api/v9/guilds/${serverID}/vanity-url`, "PATCH", '{"code":""}');
+    const r1 = await mfaH2ReqMin("PATCH", `/api/v9/guilds/${serverID}/vanity-url`, '{"code":""}');
     const ticket = r1?.mfa?.ticket;
     if (!ticket) {
-      console.log('[-] Ticket alınamadı (' + r1._st + '), 60sn sonra tekrar...');
-      setTimeout(() => handleMFA(), 60000);
+      console.log('[-] Probe fail sc=' + r1._st + ' code=' + r1?.code + ' — 30sn sonra tekrar...');
+      setTimeout(() => handleMFA(), 30000);
       return;
     }
 
-    const r2 = await h2req("/api/v9/mfa/finish", "POST", `{"ticket":"${ticket}","mfa_type":"password","data":"${password}"}`);
+    const r2 = await mfaH2ReqMin("POST", "/api/v9/mfa/finish", JSON.stringify({ ticket, mfa_type: 'password', data: password }));
     if (r2?.token) {
       mfaToken = r2.token;
       H2H_PATCH["x-discord-mfa-authorization"] = mfaToken;
